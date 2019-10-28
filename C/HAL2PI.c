@@ -5,7 +5,7 @@
 *				Based on hal_parport.c
 *
 * Author: Marcel Maage
-* License: GPL Version 2
+* License: MIT
 *    
 * Copyright (c) 2019 All rights reserved.
 *
@@ -14,94 +14,63 @@
 
 /*
 TODO:
--
--datentypen(vor allem fuer output) ergaenzen in gpio_t (data_inv, reset_time fuer jede Funktion?)
--write und reset function schreiben/ergaenzen
--parameter in pins_and_params testen
--invers signal in export_pin correct verschalten(derzeit fehlt der zweite Speicherplatz)
--invers outputwriting einprogrammieren (data_inv)
+-Adding reset time and functions
+-Adding configuration of inverse signal for input and output
 */
 
 
 
-/** This file, 'hal_parport.c', is a HAL component that provides a
-    driver for the standard PC parallel port.
+/** This file, 'HAL2PI.c', is a HAL component that provides a
+    driver for the GPIO port of the Raspberry Pi based on libgpiod.
 
-    It supports up to eight parallel ports, and if the port hardware
-    is bidirectional, the eight data bits can be configured as inputs
-    or outputs.
-
-    The configuration is determined by command line arguments for the
-    user space version of the driver, and by a config string passed
-    to insmod for the realtime version.  The format is similar for
-    both, and consists of a port address, followed by an optional
-    direction, repeated for each port.  The direction is either "in"
-    or "out" and determines the direction of the 8 bit data port.
-    The default is out.  The 5 bits of the status port are always
-    inputs, and the 4 bits of the control port are always outputs.
+    The configuration is similar to the parallel port driver and is driven
+	into the variable cfg="". In the config-string the key words 
+	"out" and "in" are allowed only ones. After the keyword follows the 
+	gpio numbers.
     Example command lines are as follows:
 
-    user:        hal_parport 378 in 278
-    realtime:    insmod hal_parport.o cfg="378 in 278"
+	loadrt 	HAL2PI cfg="in 17 22 out 18 23"
 
-    Both of these commands install the driver and configure parports
-    at base addresses 0x0378 (using data port as input) and 0x0278
-    (using data port as output).
-
-    The driver creates HAL pins and parameters for each port pin
+    The driver creates HAL pins and parameters for each pin
     as follows:
     Each physical output has a correspinding HAL pin, named
-    'parport.<portnum>.pin-<pinnum>-out', and a HAL parameter
-    'parport.<portnum>.pin-<pinnum>-out-invert'.
+    'HAL2PI.pin-<pinnum>-out', and a HAL parameter
+    'HAL2PI.pin-<pinnum>-out-invert'.
     Each physical input has two corresponding HAL pins, named
-    'parport.<portnum>.pin-<pinnum>-in' and
-    'parport.<portnum>.pin-<pinnum>-in-not'.
+    'HAL2PI.pin-<pinnum>-in' and
+    'HAL2PI.pin-<pinnum>-in-not'.
 
-    <portnum> is the port number, starting from zero.  <pinnum> is
-    the physical pin number on the DB-25 connector.
+	<pinnum> is the physical pin number on the GPIO connector.
 
     The realtime version of the driver exports two HAL functions for
-    each port, 'parport.<portnum>.read' and 'parport.<portnum>.write'.
-    It also exports two additional functions, 'parport.read-all' and
-    'parport.write-all'.  Any or all of these functions can be added
-    to realtime HAL threads to update the port data periodically.
-
-    The user space version of the driver cannot export functions,
-    instead it exports parameters with the same names.  The main()
-    function sits in a loop checking the parameters.  If they are
-    zero, it does nothing.  If any parameter is greater than zero,
-    the corresponding function runs once, then the parameter is
-    reset to zero.  If any parameter is less than zero, the
-    corresponding function runs on every pass through the loop.
-    The driver will loop forever, until it receives either
-    SIGINT (ctrl-C) or SIGTERM, at which point it cleans up and
-    exits.
-
+    each pin, 'HAL2PI.<pinnum>.read' and 'HAL2PI.<pinnum>.write'.
+    It also exports two additional functions, 'HAL2PI.read-all' and
+    'HAL2PI.write-all'.  Any or all of these functions can be added
+    to realtime HAL threads to update the pin data periodically.
 */
 
-/** This program is free software; you can redistribute it and/or
-    modify it under the terms of version 2 of the GNU General
-    Public License as published by the Free Software Foundation.
-    This library is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
+/** MIT License
 
-    You should have received a copy of the GNU General Public
-    License along with this library; if not, write to the Free Software
-    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+Copyright (c) 2019 Marcel Maage
 
-    THE AUTHORS OF THIS LIBRARY ACCEPT ABSOLUTELY NO LIABILITY FOR
-    ANY HARM OR LOSS RESULTING FROM ITS USE.  IT IS _EXTREMELY_ UNWISE
-    TO RELY ON SOFTWARE ALONE FOR SAFETY.  Any machinery capable of
-    harming persons must have provisions for completely removing power
-    from all motors, etc, before persons enter any danger area.  All
-    machinery must be designed to comply with local and national safety
-    codes, and the authors of this software can not, and do not, take
-    any responsibility for such compliance.
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
 
-    This code was written as part of the EMC HAL project.  For more
-    information, go to www.linuxcnc.org.
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
 */
 
 #include "rtapi.h"		/* RTAPI realtime OS API */
@@ -563,6 +532,7 @@ void rtapi_app_exit(void)
 static void read_pin(void *arg,long period)
 {
 	*(((gpio_t*)arg)->data)=gpiod_line_get_value(((gpio_t*)arg)->line);
+	//*(((gpio_t*)arg)->data_inv)=!(*(((gpio_t*)arg)->data));
     // rtapi_print_msg(RTAPI_MSG_INFO,
 	    // "HAL2PI: read_port\n");
 }
