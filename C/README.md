@@ -4,24 +4,37 @@ hal to directly access the gpios of a raspberry pi with linuxcnc
 This project is based on HAL2Arduino.
 See: https://github.com/dewy721/EMC-2-Arduino/tree/master/Downloads/HAL2Arduino
 
-# HAL2PI C install Guide
+# HAL2PI C install Guide (now called hal_pi_gpio)
 
 1.Copy the folder to your LinuxCNC maschine.
-2.Install libgpiod. See https://forum.armbian.com/topic/6249-build-libgpiod-the-new-gpio-interface-for-user-space/
+
+2.Install libgpiod
+
 3.Go to linuxcnc-dev/scripts
+
 4.Execute: . ./rip-environment
+
 5.Modify linuxcnc-dev/src/Makefile.modinc in line 86 with LDFLAGS = -lgpiod or copy the given file
+
 6.Go back to other machine folder
-7.Execute: halcompile --install HAL2PI.c 
+
+7.Execute: halcompile --install hal_pi_gpio.c 
+
 8.Have fun
 
 The Example uses pin 18 at output of enable joint0 and pin 17 as input but no destination 
 
-To change the inputs and outputs, change loadrt HAL2PI cfg="in 17 out 18" in .hal
+To change the inputs and outputs, change loadrt hal_pi_gpio cfg="in 17 out 18" in .hal
 
 Note: this project is based on hal_parport. There is currently not the same reset function that is given there.
 
-# Compiling libgpiod 
+# Installing libgpiod
+Since Raspbian Buster you can install libgpiod just by typing:
+
+sudo apt install libgpiod-dev
+
+
+# Compiling libgpiod (old way)
 https://forum.armbian.com/topic/6249-build-libgpiod-the-new-gpio-interface-for-user-space/
 
     sudo armbian-config, Software, Headers
