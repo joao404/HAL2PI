@@ -7,10 +7,8 @@ loadrt [EMCMOT]EMCMOT base_period_nsec=[EMCMOT]BASE_PERIOD servo_period_nsec=[EM
 loadrt stepgen step_type=0,0,0,0,0,0
 loadrt pwmgen output_type=1
 
-loadrt HAL2PI cfg="in 17 out 18"
+loadrt hal_pi_gpio cfg="in 17 out 18"
 
-#First load the Python user module named /user/bin/HAL2Arduino-0.6.py with the name 'Hal2Arduino'
-#loadusr -Wn HAL2PI ./HAL2PI-0.1.py
 
 #CONSTANT
 #setp mk2kins.L1 135.0
@@ -45,8 +43,8 @@ addf motion-command-handler servo-thread
 addf motion-controller servo-thread
 addf stepgen.update-freq servo-thread
 addf pwmgen.update servo-thread
-addf HAL2PI.write-all servo-thread
-addf HAL2PI.read-all servo-thread
+addf hal_pi_gpio.write-all servo-thread
+addf hal_pi_gpio.read-all servo-thread
 
 
 #HOMING MAX_NEG MAX_POS HOMED
@@ -133,10 +131,10 @@ addf HAL2PI.read-all servo-thread
 #net j5-pos-cmd Hal2Arduino.axis_5_joint-pos-cmd
 
 
-net j0-enable HAL2PI.pin-18-out
-#net j0-enable HAL2PI.gpio_22
-#net j0-dir HAL2PI.gpio_23
-#net j0-step HAL2PI.gpio_24
+net j0-enable hal_pi_gpio.pin-18-out
+#net j0-enable hal_pi_gpio.gpio_22
+#net j0-dir hal_pi_gpio.gpio_23
+#net j0-step hal_pi_gpio.gpio_24
 
 
 #******************

@@ -1,6 +1,6 @@
 /********************************************************************
-* Description:  HAL2PI.c
-*               This file, 'HAL2PI.c', is a HAL component that 
+* Description:  hal_pi_gpio.c
+*               This file, 'hal_pi_gpio.c', is a HAL component that 
 *               provides a driver for the GPIOs of a raspberry pi with the help of gpiod lib and /dev/gpiochip0.
 *				Based on hal_parport.c
 *
@@ -20,7 +20,7 @@ TODO:
 
 
 
-/** This file, 'HAL2PI.c', is a HAL component that provides a
+/** This file, 'hal_pi_gpio.c', is a HAL component that provides a
     driver for the GPIO port of the Raspberry Pi based on libgpiod.
 
     The configuration is similar to the parallel port driver and is driven
@@ -29,23 +29,23 @@ TODO:
 	gpio numbers.
     Example command lines are as follows:
 
-	loadrt 	HAL2PI cfg="in 17 22 out 18 23"
+	loadrt 	hal_pi_gpio cfg="in 17 22 out 18 23"
 
     The driver creates HAL pins and parameters for each pin
     as follows:
     Each physical output has a correspinding HAL pin, named
-    'HAL2PI.pin-<pinnum>-out', and a HAL parameter
-    'HAL2PI.pin-<pinnum>-out-invert'.
+    'hal_pi_gpio.pin-<pinnum>-out', and a HAL parameter
+    'hal_pi_gpio.pin-<pinnum>-out-invert'.
     Each physical input has two corresponding HAL pins, named
-    'HAL2PI.pin-<pinnum>-in' and
-    'HAL2PI.pin-<pinnum>-in-not'.
+    'hal_pi_gpio.pin-<pinnum>-in' and
+    'hal_pi_gpio.pin-<pinnum>-in-not'.
 
 	<pinnum> is the physical pin number on the GPIO connector.
 
     The realtime version of the driver exports two HAL functions for
-    each pin, 'HAL2PI.<pinnum>.read' and 'HAL2PI.<pinnum>.write'.
-    It also exports two additional functions, 'HAL2PI.read-all' and
-    'HAL2PI.write-all'.  Any or all of these functions can be added
+    each pin, 'hal_pi_gpio.<pinnum>.read' and 'hal_pi_gpio.<pinnum>.write'.
+    It also exports two additional functions, 'hal_pi_gpio.read-all' and
+    'hal_pi_gpio.write-all'.  Any or all of these functions can be added
     to realtime HAL threads to update the pin data periodically.
 */
 
@@ -201,7 +201,7 @@ int rtapi_app_main(void)
 
     /* test for config string */
     if (cfg == 0) {
-	rtapi_print_msg(RTAPI_MSG_ERR, "HAL2PI: ERROR: no config string\n");
+	rtapi_print_msg(RTAPI_MSG_ERR, "hal_pi_gpio: ERROR: no config string\n");
 	return -1;
     }
 rtapi_print ( "config string '%s'\n", cfg );
@@ -240,8 +240,8 @@ rtapi_print ( "config string '%s'\n", cfg );
 	
 	// i=0;
 	// // rtapi_print_msg(RTAPI_MSG_INFO,
-	    // // "HAL2PI:");
-	// rtapi_print ( "HAL2PI" );
+	    // // "hal_pi_gpio:");
+	// rtapi_print ( "hal_pi_gpio" );
 	// while(argv[i]!=NULL)
 	// {
 		// // rtapi_print_msg(RTAPI_MSG_INFO,
@@ -255,9 +255,9 @@ rtapi_print ( "config string '%s'\n", cfg );
 	
 	
 	/* have good config info, connect to the HAL */
-    comp_id = hal_init("HAL2PI");
+    comp_id = hal_init("hal_pi_gpio");
     if (comp_id < 0) {
-	rtapi_print_msg(RTAPI_MSG_ERR, "HAL2PI: ERROR: hal_init() failed\n");
+	rtapi_print_msg(RTAPI_MSG_ERR, "hal_pi_gpio: ERROR: hal_init() failed\n");
 	return -1;
     }
 	
@@ -267,7 +267,7 @@ rtapi_print ( "config string '%s'\n", cfg );
     if (!chip)
 	{
 		rtapi_print_msg(RTAPI_MSG_ERR,
-			"HAL2PI: ERROR: gpiod_chip_open() failed\n");
+			"hal_pi_gpio: ERROR: gpiod_chip_open() failed\n");
 		hal_exit(comp_id);
 		return-1;
 	}		
@@ -304,7 +304,7 @@ rtapi_print ( "config string '%s'\n", cfg );
 					output_ptr_array[num_outputs] = hal_malloc(sizeof(gpio_t));
 					if (output_ptr_array[num_outputs] == 0) {
 						rtapi_print_msg(RTAPI_MSG_ERR,
-							"HAL2PI: ERROR: hal_malloc() failed\n");
+							"hal_pi_gpio: ERROR: hal_malloc() failed\n");
 						app_exit();
 						return -1;
 					}
@@ -318,7 +318,7 @@ rtapi_print ( "config string '%s'\n", cfg );
 			input_ptr_array[num_inputs] = hal_malloc(sizeof(gpio_t));
 			if (input_ptr_array[num_inputs] == 0) {
 				rtapi_print_msg(RTAPI_MSG_ERR,
-					"HAL2PI: ERROR: hal_malloc() failed\n");
+					"hal_pi_gpio: ERROR: hal_malloc() failed\n");
 				app_exit();
 				return -1;
 			}
@@ -342,7 +342,7 @@ rtapi_print ( "config string '%s'\n", cfg );
 					input_ptr_array[num_inputs] = hal_malloc(sizeof(gpio_t));
 					if (input_ptr_array[num_inputs] == 0) {
 						rtapi_print_msg(RTAPI_MSG_ERR,
-							"HAL2PI: ERROR: hal_malloc() failed\n");
+							"hal_pi_gpio: ERROR: hal_malloc() failed\n");
 						app_exit();
 						return -1;
 					}
@@ -356,7 +356,7 @@ rtapi_print ( "config string '%s'\n", cfg );
 			output_ptr_array[num_outputs] = hal_malloc(sizeof(gpio_t));
 			if (output_ptr_array[num_outputs] == 0) {
 				rtapi_print_msg(RTAPI_MSG_ERR,
-					"HAL2PI: ERROR: hal_malloc() failed\n");
+					"hal_pi_gpio: ERROR: hal_malloc() failed\n");
 				app_exit();
 				return -1;
 			}
@@ -371,7 +371,7 @@ rtapi_print ( "config string '%s'\n", cfg );
 		
 	// rtapi_print_msg(RTAPI_MSG_INFO,
 	rtapi_print(
-			"HAL2PI: outputs: %d inputs %d\n",num_outputs,num_inputs);
+			"hal_pi_gpio: outputs: %d inputs %d\n",num_outputs,num_inputs);
 	
 	//last elemnt is zero
 	output_ptr_array[num_outputs]=NULL;
@@ -413,14 +413,14 @@ rtapi_print ( "config string '%s'\n", cfg );
 	
 	//reset time for reseting everything when time is over
 	//retval += hal_param_u32_newf(HAL_RW, &reset_time, comp_id, 
-	//		"HAL2PI.reset-time");
+	//		"hal_pi_gpio.reset-time");
 
 
 	//check retval if any errors occured
 	if(retval!=0)
 	{
 		rtapi_print_msg(RTAPI_MSG_ERR,
-			"HAL2PI: ERROR: export_pins() failed\n");
+			"hal_pi_gpio: ERROR: export_pins() failed\n");
 		app_exit();
 		return -1;
 	}
@@ -432,13 +432,13 @@ rtapi_print ( "config string '%s'\n", cfg );
 	for(i=0;i<num_inputs;i++)
 	{
 		/* make read function name */
-		rtapi_snprintf(name, sizeof(name), "HAL2PI.%02d.read", i);
+		rtapi_snprintf(name, sizeof(name), "hal_pi_gpio.%02d.read", i);
 		/* export read function */
 		retval = hal_export_funct(name, read_pin, &(input_ptr_array[i]),
 			0, 0, comp_id);
 		if (retval != 0) {
 			rtapi_print_msg(RTAPI_MSG_ERR,
-				"HAL2PI: ERROR: pin %d read funct export failed\n", i);
+				"hal_pi_gpio: ERROR: pin %d read funct export failed\n", i);
 			app_exit();
 			return -1;
 		}
@@ -447,24 +447,24 @@ rtapi_print ( "config string '%s'\n", cfg );
 	for(i=0;i<num_outputs;i++)
 	{
 		/* make write function name */
-		rtapi_snprintf(name, sizeof(name), "HAL2PI.%02d.write", i);
+		rtapi_snprintf(name, sizeof(name), "hal_pi_gpio.%02d.write", i);
 		/* export write function */
 		retval = hal_export_funct(name, write_pin, &(output_ptr_array[i]),
 			0, 0, comp_id);
 		if (retval != 0) {
 			rtapi_print_msg(RTAPI_MSG_ERR,
-				"HAL2PI: ERROR: pin %d write funct export failed\n", i);
+				"hal_pi_gpio: ERROR: pin %d write funct export failed\n", i);
 			app_exit();
 			return -1;
 		}
 		/* make reset function name */
-		rtapi_snprintf(name, sizeof(name), "HAL2PI.%02d.reset", i);
+		rtapi_snprintf(name, sizeof(name), "hal_pi_gpio.%02d.reset", i);
 		/* export write function */
 		retval = hal_export_funct(name, reset_pin, &(output_ptr_array[i]),
 			0, 0, comp_id);
 		if (retval != 0) {
 			rtapi_print_msg(RTAPI_MSG_ERR,
-				"HAL2PI: ERROR: pin %d reset funct export failed\n", i);
+				"hal_pi_gpio: ERROR: pin %d reset funct export failed\n", i);
 			app_exit();
 			return -1;
 		}
@@ -475,19 +475,19 @@ rtapi_print ( "config string '%s'\n", cfg );
 		
 
     /* export functions that read and write all pins */
-    retval = hal_export_funct("HAL2PI.read-all", read_all,
+    retval = hal_export_funct("hal_pi_gpio.read-all", read_all,
 	input_ptr_array, 0, 0, comp_id);
     if (retval != 0) {
 	rtapi_print_msg(RTAPI_MSG_ERR,
-	    "HAL2PI: ERROR: read all funct export failed\n");
+	    "hal_pi_gpio: ERROR: read all funct export failed\n");
 	app_exit();
 	return -1;
     }
-    retval = hal_export_funct("HAL2PI.write-all", write_all,
+    retval = hal_export_funct("hal_pi_gpio.write-all", write_all,
 	output_ptr_array, 0, 0, comp_id);
     if (retval != 0) {
 	rtapi_print_msg(RTAPI_MSG_ERR,
-	    "HAL2PI: ERROR: write all funct export failed\n");
+	    "hal_pi_gpio: ERROR: write all funct export failed\n");
 	app_exit();
 	return -1;
     }
@@ -498,7 +498,7 @@ rtapi_print ( "config string '%s'\n", cfg );
 		
     // rtapi_print_msg(RTAPI_MSG_INFO,
 	rtapi_print(
-	"HAL2PI: installed driver \n");
+	"hal_pi_gpio: installed driver \n");
     hal_ready(comp_id);
     return 0;
 }
@@ -532,7 +532,7 @@ static void read_pin(void *arg,long period)
 	*(((gpio_t*)arg)->data)=gpiod_line_get_value(((gpio_t*)arg)->line);
 	//*(((gpio_t*)arg)->data_inv)=!(*(((gpio_t*)arg)->data));
     // rtapi_print_msg(RTAPI_MSG_INFO,
-	    // "HAL2PI: read_port\n");
+	    // "hal_pi_gpio: read_port\n");
 }
 
 static void reset_pin(void *arg,long period) 
@@ -565,7 +565,7 @@ static void write_pin(void *arg,long period)
 {
 	gpiod_line_set_value(((gpio_t*)arg)->line,*(((gpio_t*)arg)->data));	
     // rtapi_print_msg(RTAPI_MSG_INFO,
-	    // "HAL2PI: write_pin\n",);
+	    // "hal_pi_gpio: write_pin\n",);
 }
 
 void read_all(void *arg,long period)
@@ -575,7 +575,7 @@ void read_all(void *arg,long period)
 		read_pin((void*)(((gpio_t**)arg)[i]),period);
 	}
     rtapi_print_msg(RTAPI_MSG_INFO,
-	    "HAL2PI: read_all\n");
+	    "hal_pi_gpio: read_all\n");
 }
 
 void write_all(void *arg, long period)
@@ -585,7 +585,7 @@ void write_all(void *arg, long period)
 		write_pin((void*)(((gpio_t**)arg)[i]),period);
 	}
     rtapi_print_msg(RTAPI_MSG_INFO,
-	    "HAL2PI: write_all\n");
+	    "hal_pi_gpio: write_all\n");
 }
 
 static int export_input_pin(int pin, hal_bit_t ** base)
@@ -594,13 +594,13 @@ static int export_input_pin(int pin, hal_bit_t ** base)
 
     /* export write only HAL pin for the input bit */
     retval = hal_pin_bit_newf(HAL_OUT, base, comp_id,
-            "HAL2PI.pin-%02d-in", pin);
+            "hal_pi_gpio.pin-%02d-in", pin);
     if (retval != 0) {
 	return retval;
     }
     /* export another write only HAL pin for the same bit inverted */
     retval = hal_pin_bit_newf(HAL_OUT, base + 1, comp_id,
-            "HAL2PI.pin-%02d-in-not", pin);
+            "hal_pi_gpio.pin-%02d-in-not", pin);
     return retval;
 }
 
@@ -611,19 +611,19 @@ static int export_output_pin(int pin, hal_bit_t ** dbase,
 
     /* export read only HAL pin for output data */
     retval = hal_pin_bit_newf(HAL_IN, dbase, comp_id,
-            "HAL2PI.pin-%02d-out", pin);
+            "hal_pi_gpio.pin-%02d-out", pin);
     if (retval != 0) {
 	return retval;
     }
     /* export parameter for polarity */
     retval = hal_param_bit_newf(HAL_RW, pbase, comp_id,
-            "HAL2PI.pin-%02d-out-invert", pin);
+            "hal_pi_gpio.pin-%02d-out-invert", pin);
     if (retval != 0) {
 	return retval;
     }
     /* export parameter for reset */
     if (rbase)
 	retval = hal_param_bit_newf(HAL_RW, rbase, comp_id,
-		"HAL2PI.pin-%02d-out-reset", pin);
+		"hal_pi_gpio.pin-%02d-out-reset", pin);
     return retval;
 }
