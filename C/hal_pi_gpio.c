@@ -14,8 +14,7 @@
 
 /*
 TODO:
--Adding reset time and functions
--Adding configuration of inverse signal for input and output
+-Writing reset function and adding write_time_ctrl
 */
 
 
@@ -95,7 +94,7 @@ SOFTWARE.
 MODULE_AUTHOR("Marcel Maage");
 MODULE_DESCRIPTION("GPIO Raspberry Pi Driver for EMC HAL");
 MODULE_LICENSE("GPL");
-static char *cfg = "0x0278";	/* config string, default 1 output port at 278 */
+static char *cfg = "in out";	/* config string, default 1 output port at 278 */
 RTAPI_MP_STRING(cfg, "config string");
 
 /***********************************************************************
@@ -134,16 +133,18 @@ RTAPI_MP_STRING(cfg, "config string");
 
 typedef struct {
 	int pinnum;
-    hal_bit_t* data;	
+    hal_bit_t* data_in[2];	
+	hal_bit_t* data_out;	
 	hal_bit_t data_inv;	/* polarity params */
     hal_bit_t data_reset;	/* reset flag for output */
+	hal_bit_t data_reset_val;
 	struct gpiod_line *line;
 } gpio_t;
 /* pointer to array of parport_t structs in shared memory, 1 per port */
 static gpio_t *input_ptr_array[26];
 static gpio_t *output_ptr_array[26];
 
-static hal_u32_t reset_time;       /* min ns between write and reset */
+static hal_u32_t* reset_time;       /* min ns between write and reset */
 
 struct gpiod_chip *chip;
 
@@ -164,8 +165,8 @@ static unsigned long ns2tsc_factor;
 */
 static void app_exit(void);
 static void read_pin(void *arg,long period);
-static void reset_pin(void *arg,long period);
 static void write_pin(void *arg,long period);
+static void reset_all(void *arg,long period);
 static void read_all(void *arg,long period);
 static void write_all(void *arg,long period);
 
@@ -275,10 +276,10 @@ rtapi_print ( "config string '%s'\n", cfg );
 	
 	//geting argv parameters
 	//input is:
-	//in 18 19 21 out 22 23 24 or out 22 23 24 in 18 19 21
+	//"in 18 19 21 out 22 23 24" or "out 22 23 24 in 18 19 21"
 	//no other directions are allowed
 	
-	//out in out is not allowed
+	//"out in out" is not allowed
 	
 	i=0;
 		
@@ -377,6 +378,7 @@ rtapi_print ( "config string '%s'\n", cfg );
 	output_ptr_array[num_outputs]=NULL;
 	input_ptr_array[num_inputs]=NULL;
 	
+	
 	//line of chip
 	for(i=0;i<num_inputs;i++)
 	{
@@ -395,25 +397,34 @@ rtapi_print ( "config string '%s'\n", cfg );
 	}
 	
 	
+	//getting memory for reset_time
+	reset_time = hal_malloc(sizeof(hal_u32_t));
+	if (reset_time == 0) {
+		rtapi_print_msg(RTAPI_MSG_ERR,
+			"hal_pi_gpio: ERROR: hal_malloc() failed\n");
+		app_exit();
+		return -1;
+	}
+	
 	
 	retval=0;
 	
 	//export_pins by giving the data where read/write is done to
 	for(i=0;i<num_inputs;i++)
 	{
-		retval += export_input_pin(input_ptr_array[i]->pinnum, &(input_ptr_array[i]->data)); 
+		retval += export_input_pin(input_ptr_array[i]->pinnum, input_ptr_array[i]->data_in); 
 	}
 	
 	for(i=0;i<num_outputs;i++)
 	{
 		retval += export_output_pin(output_ptr_array[i]->pinnum,
-			&(output_ptr_array[i]->data), &(output_ptr_array[i]->data_inv), &(output_ptr_array[i]->data_reset));
+			&(output_ptr_array[i]->data_out), &(output_ptr_array[i]->data_inv), &(output_ptr_array[i]->data_reset));
 	}
 	
 	
 	//reset time for reseting everything when time is over
-	//retval += hal_param_u32_newf(HAL_RW, &reset_time, comp_id, 
-	//		"hal_pi_gpio.reset-time");
+	retval += hal_param_u32_newf(HAL_RW, reset_time, comp_id, 
+			"hal_pi_gpio.reset-time");
 
 
 	//check retval if any errors occured
@@ -457,17 +468,17 @@ rtapi_print ( "config string '%s'\n", cfg );
 			app_exit();
 			return -1;
 		}
-		/* make reset function name */
-		rtapi_snprintf(name, sizeof(name), "hal_pi_gpio.%02d.reset", i);
-		/* export write function */
-		retval = hal_export_funct(name, reset_pin, &(output_ptr_array[i]),
-			0, 0, comp_id);
-		if (retval != 0) {
-			rtapi_print_msg(RTAPI_MSG_ERR,
-				"hal_pi_gpio: ERROR: pin %d reset funct export failed\n", i);
-			app_exit();
-			return -1;
-		}
+		// /* make reset function name */
+		// rtapi_snprintf(name, sizeof(name), "hal_pi_gpio.%02d.reset", i);
+		// /* export write function */
+		// retval = hal_export_funct(name, reset_pin, &(output_ptr_array[i]),
+			// 0, 0, comp_id);
+		// if (retval != 0) {
+			// rtapi_print_msg(RTAPI_MSG_ERR,
+				// "hal_pi_gpio: ERROR: pin %d reset funct export failed\n", i);
+			// app_exit();
+			// return -1;
+		// }
 	}
 	
 	
@@ -475,7 +486,7 @@ rtapi_print ( "config string '%s'\n", cfg );
 		
 
     /* export functions that read and write all pins */
-    retval = hal_export_funct("hal_pi_gpio.read-all", read_all,
+    retval = hal_export_funct("hal_pi_gpio.read", read_all,
 	input_ptr_array, 0, 0, comp_id);
     if (retval != 0) {
 	rtapi_print_msg(RTAPI_MSG_ERR,
@@ -483,7 +494,7 @@ rtapi_print ( "config string '%s'\n", cfg );
 	app_exit();
 	return -1;
     }
-    retval = hal_export_funct("hal_pi_gpio.write-all", write_all,
+    retval = hal_export_funct("hal_pi_gpio.write", write_all,
 	output_ptr_array, 0, 0, comp_id);
     if (retval != 0) {
 	rtapi_print_msg(RTAPI_MSG_ERR,
@@ -492,7 +503,17 @@ rtapi_print ( "config string '%s'\n", cfg );
 	return -1;
     }
 	
-	
+	/* make reset function name */
+	rtapi_snprintf(name, sizeof(name), "hal_pi_gpio.reset", i);
+	/* export write function */
+	retval = hal_export_funct(name, reset_all, output_ptr_array,
+		0, 0, comp_id);
+	if (retval != 0) {
+		rtapi_print_msg(RTAPI_MSG_ERR,
+			"hal_pi_gpio: ERROR: reset funct export failed\n", i);
+		app_exit();
+		return -1;
+	}
 	
 	
 		
@@ -529,15 +550,38 @@ void rtapi_app_exit(void)
 
 static void read_pin(void *arg,long period)
 {
-	*(((gpio_t*)arg)->data)=gpiod_line_get_value(((gpio_t*)arg)->line);
-	//*(((gpio_t*)arg)->data_inv)=!(*(((gpio_t*)arg)->data));
+	*(((gpio_t*)arg)->data_in[0])=gpiod_line_get_value(((gpio_t*)arg)->line);
+	*(((gpio_t*)arg)->data_in[1])=!(*(((gpio_t*)arg)->data_in[0]));
     // rtapi_print_msg(RTAPI_MSG_INFO,
 	    // "hal_pi_gpio: read_port\n");
 }
 
-static void reset_pin(void *arg,long period) 
+static void write_pin(void *arg,long period)
 {
-    // gpio_t *port = arg;
+	
+	if ((*(((gpio_t*)arg)->data_out)) && (!((gpio_t*)arg)->data_inv)) {
+		gpiod_line_set_value(((gpio_t*)arg)->line,1);//set high
+	}
+	else if ((!*(((gpio_t*)arg)->data_out)) && (((gpio_t*)arg)->data_inv)) {
+		gpiod_line_set_value(((gpio_t*)arg)->line,1);//set high
+	}
+	else//set low
+	{
+		gpiod_line_set_value(((gpio_t*)arg)->line,0);
+	}
+		
+	((gpio_t*)arg)->data_reset_val=0;
+	if (((gpio_t*)arg)->data_reset) ((gpio_t*)arg)->data_reset_val=1;
+	if(((gpio_t*)arg)->data_inv) ((gpio_t*)arg)->data_reset_val=1;
+	
+	//gpiod_line_set_value(((gpio_t*)arg)->line,*(((gpio_t*)arg)->data));	
+    // rtapi_print_msg(RTAPI_MSG_INFO,
+	    // "hal_pi_gpio: write_pin\n",);
+}
+
+static void reset_all(void *arg,long period) 
+{
+    // gpio_t **pins = ((gpio_t**)arg);
     // long long deadline, reset_time_tsc;
     // unsigned char outdata = (port->outdata&~port->reset_mask) ^ port->reset_val;
    
@@ -559,13 +603,12 @@ static void reset_pin(void *arg,long period)
         // while(rtapi_get_clocks() < deadline) {}
         // rtapi_outb(outdata, port->base_addr + 2);
     // }
-}
-
-static void write_pin(void *arg,long period)
-{
-	gpiod_line_set_value(((gpio_t*)arg)->line,*(((gpio_t*)arg)->data));	
-    // rtapi_print_msg(RTAPI_MSG_INFO,
-	    // "hal_pi_gpio: write_pin\n",);
+	
+	// for(int i=0;((gpio_t**)arg)[i]!=NULL;i++)
+	// {
+		// write_pin((void*)(((gpio_t**)arg)[i]),period);
+	// }
+	
 }
 
 void read_all(void *arg,long period)
@@ -574,8 +617,8 @@ void read_all(void *arg,long period)
 	{
 		read_pin((void*)(((gpio_t**)arg)[i]),period);
 	}
-    rtapi_print_msg(RTAPI_MSG_INFO,
-	    "hal_pi_gpio: read_all\n");
+    // rtapi_print_msg(RTAPI_MSG_INFO,
+	    // "hal_pi_gpio: read_all\n");
 }
 
 void write_all(void *arg, long period)
@@ -584,8 +627,8 @@ void write_all(void *arg, long period)
 	{
 		write_pin((void*)(((gpio_t**)arg)[i]),period);
 	}
-    rtapi_print_msg(RTAPI_MSG_INFO,
-	    "hal_pi_gpio: write_all\n");
+    // rtapi_print_msg(RTAPI_MSG_INFO,
+	    // "hal_pi_gpio: write_all\n");
 }
 
 static int export_input_pin(int pin, hal_bit_t ** base)
