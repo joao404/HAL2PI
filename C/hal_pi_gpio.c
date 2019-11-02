@@ -14,7 +14,8 @@
 
 /*
 TODO:
--Writing reset function and adding write_time_ctrl
+-testing of reset
+-Adding Pull Up, when libgpiod supports it
 */
 
 
@@ -144,6 +145,8 @@ typedef struct {
 static gpio_t *input_ptr_array[26];
 static gpio_t *output_ptr_array[26];
 
+
+long long write_time;			/* last time when write was executed */
 static hal_u32_t* reset_time;       /* min ns between write and reset */
 
 struct gpiod_chip *chip;
@@ -515,7 +518,7 @@ rtapi_print ( "config string '%s'\n", cfg );
 		return -1;
 	}
 	
-	
+	write_time = rtapi_get_clocks();
 		
     // rtapi_print_msg(RTAPI_MSG_INFO,
 	rtapi_print(
@@ -571,7 +574,7 @@ static void write_pin(void *arg,long period)
 	}
 		
 	((gpio_t*)arg)->data_reset_val=0;
-	if (((gpio_t*)arg)->data_reset) ((gpio_t*)arg)->data_reset_val=1;
+	// if (((gpio_t*)arg)->data_reset) ((gpio_t*)arg)->data_reset_val=1;
 	if(((gpio_t*)arg)->data_inv) ((gpio_t*)arg)->data_reset_val=1;
 	
 	//gpiod_line_set_value(((gpio_t*)arg)->line,*(((gpio_t*)arg)->data));	
@@ -581,12 +584,12 @@ static void write_pin(void *arg,long period)
 
 static void reset_all(void *arg,long period) 
 {
-    // gpio_t **pins = ((gpio_t**)arg);
-    // long long deadline, reset_time_tsc;
-    // unsigned char outdata = (port->outdata&~port->reset_mask) ^ port->reset_val;
+    gpio_t **pins = ((gpio_t**)arg);
+    long long deadline, reset_time_tsc;
+    // unsigned char outdata = (port->outdata&~port->reset_mask) ^ port->reset_val;   
    
-    // if(reset_time > period/4) reset_time = period/4;
-    // reset_time_tsc = ns2tsc(reset_time);
+    if(*reset_time > period/4) *reset_time = period/4;
+    reset_time_tsc = ns2tsc(*reset_time);
 
     // if(outdata != port->outdata) {
         // deadline = port->write_time + reset_time_tsc;
@@ -594,20 +597,19 @@ static void reset_all(void *arg,long period)
         // rtapi_outb(outdata, port->base_addr);
     // }
 
-    // outdata = (port->outdata_ctrl&~port->reset_mask_ctrl)^port->reset_val_ctrl;
-
-    // if(outdata != port->outdata_ctrl) {
-	// /* correct for hardware inverters on pins 1, 14, & 17 */
-	// outdata ^= 0x0B;
-        // deadline = port->write_time_ctrl + reset_time_tsc;
-        // while(rtapi_get_clocks() < deadline) {}
-        // rtapi_outb(outdata, port->base_addr + 2);
-    // }
+	deadline = write_time + reset_time_tsc;
+    while(rtapi_get_clocks() < deadline) {}
 	
-	// for(int i=0;((gpio_t**)arg)[i]!=NULL;i++)
-	// {
-		// write_pin((void*)(((gpio_t**)arg)[i]),period);
-	// }
+	for(int i=0;pins[i]!=NULL;i++)
+	{
+		if(pins[i]->data_reset!=0)
+		{
+			if(pins[i]->data_reset_val==0)
+				gpiod_line_set_value(pins[i]->line,0);
+			else
+				gpiod_line_set_value(pins[i]->line,1);
+		}
+	}
 	
 }
 
@@ -627,6 +629,7 @@ void write_all(void *arg, long period)
 	{
 		write_pin((void*)(((gpio_t**)arg)[i]),period);
 	}
+	write_time = rtapi_get_clocks();
     // rtapi_print_msg(RTAPI_MSG_INFO,
 	    // "hal_pi_gpio: write_all\n");
 }
